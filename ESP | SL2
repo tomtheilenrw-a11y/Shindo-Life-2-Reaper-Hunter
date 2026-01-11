@@ -278,7 +278,7 @@ Players.PlayerAdded:Connect(createESP)
 
 UIS.InputBegan:Connect(function(input, gp)
     if gp then return end
-    if input.KeyCode == Enum.KeyCode.F then
+    if input.KeyCode == Enum.KeyCode.Unknown then
         espEnabled = not espEnabled
         for _, p in pairs(Players:GetPlayers()) do
             if p.Character and p.Character:FindFirstChild("Head") then
