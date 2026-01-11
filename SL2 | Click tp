@@ -1,0 +1,37 @@
+-- LocalScript (StarterPlayerScripts)
+
+local UIS = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+
+local ctrlDown = false
+
+-- STRG gedrückt halten
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl then
+        ctrlDown = true
+    end
+end)
+
+UIS.InputEnded:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl then
+        ctrlDown = false
+    end
+end)
+
+-- Klick → TP
+mouse.Button1Down:Connect(function()
+    if not ctrlDown then return end
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+    local hrp = char.HumanoidRootPart
+    local target = mouse.Hit
+
+    if target then
+        hrp.CFrame = CFrame.new(target.Position + Vector3.new(0, 3, 0))
+    end
+end)
