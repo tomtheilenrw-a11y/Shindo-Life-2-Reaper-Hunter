@@ -98,8 +98,8 @@ end
 
 local MIN_SCALE = 0.9
 local MAX_SCALE = 1.2
-local MIN_DIST = 20
-local MAX_DIST = 2500000
+local MIN_DIST = 0
+local MAX_DIST = 25000000000000000000
 
 local function getScale(distance)
     local alpha = math.clamp((distance - MIN_DIST) / (MAX_DIST - MIN_DIST), 0, 1)
