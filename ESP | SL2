@@ -1,0 +1,292 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local espEnabled = true
+
+--------------------------------------------------------------------
+-- 🔥 ATTACK TRACKING
+--------------------------------------------------------------------
+
+local isAttacking = false
+local marked = {} -- players you have hit at least once
+
+-- Detect when YOU attack
+UIS.InputBegan:Connect(function(input, gp)
+    if gp then return end
+
+    -- Left click = attack
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isAttacking = true
+        task.delay(0.25, function()
+            isAttacking = false
+        end)
+    end
+
+    -- Additional attack keys
+    if input.KeyCode == Enum.KeyCode.E or
+       input.KeyCode == Enum.KeyCode.Q or
+       input.KeyCode == Enum.KeyCode.R then
+
+        isAttacking = true
+        task.delay(0.35, function()
+            isAttacking = false
+        end)
+    end
+end)
+
+local function registerDamage(player)
+    marked[player] = true
+end
+
+--------------------------------------------------------------------
+-- 🔥 KILL MESSAGE UI (BOTTOM RIGHT)
+--------------------------------------------------------------------
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local KillMessage = Instance.new("TextLabel")
+KillMessage.Size = UDim2.new(0, 320, 0, 40)
+KillMessage.Position = UDim2.new(1, -330, 1, -60)
+KillMessage.BackgroundTransparency = 0.25
+KillMessage.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+KillMessage.TextColor3 = Color3.fromRGB(255, 80, 80)
+KillMessage.TextStrokeTransparency = 0.5
+KillMessage.Font = Enum.Font.GothamBold
+KillMessage.TextSize = 20
+KillMessage.Visible = false
+KillMessage.Parent = ScreenGui
+
+Instance.new("UICorner", KillMessage).CornerRadius = UDim.new(0, 8)
+
+local isShowingKill = false
+
+local function showKillMessage(victimName)
+    if isShowingKill then return end
+    isShowingKill = true
+
+    KillMessage.Text = "You killed " .. victimName
+    KillMessage.Visible = true
+    KillMessage.BackgroundTransparency = 1
+    KillMessage.TextTransparency = 1
+
+    TweenService:Create(KillMessage, TweenInfo.new(0.25), {
+        BackgroundTransparency = 0.25,
+        TextTransparency = 0
+    }):Play()
+
+    task.wait(2.3)
+
+    TweenService:Create(KillMessage, TweenInfo.new(0.3), {
+        BackgroundTransparency = 1,
+        TextTransparency = 1
+    }):Play()
+
+    task.wait(0.3)
+    KillMessage.Visible = false
+    isShowingKill = false
+end
+
+--------------------------------------------------------------------
+-- 🔥 ESP + KO + HP + KILL SYSTEM
+--------------------------------------------------------------------
+
+local MIN_SCALE = 0.9
+local MAX_SCALE = 1.2
+local MIN_DIST = 20
+local MAX_DIST = 2500000
+
+local function getScale(distance)
+    local alpha = math.clamp((distance - MIN_DIST) / (MAX_DIST - MIN_DIST), 0, 1)
+    return MAX_SCALE - (MAX_SCALE - MIN_SCALE) * alpha
+end
+
+local function healthColor(percent)
+    if percent > 0.6 then
+        return Color3.fromRGB(0, 200, 120)
+    elseif percent > 0.3 then
+        return Color3.fromRGB(255, 180, 60)
+    else
+        return Color3.fromRGB(220, 70, 70)
+    end
+end
+
+local function waitFor(obj, name)
+    while not obj:FindFirstChild(name) do
+        obj.ChildAdded:Wait()
+    end
+    return obj:FindFirstChild(name)
+end
+
+local function tryKill(player, killAlreadyCounted)
+    if killAlreadyCounted then return true end
+    if marked[player] then
+        showKillMessage(player.Name)
+        marked[player] = nil
+        return true
+    end
+    return false
+end
+
+local function createESP(player)
+    if player == LocalPlayer then return end
+
+    local function onCharacter(char)
+        local head = waitFor(char, "Head")
+        local humanoid = waitFor(char, "Humanoid")
+        local hrp = waitFor(char, "HumanoidRootPart")
+
+        if head:FindFirstChild("ESP_UI") then
+            head.ESP_UI:Destroy()
+        end
+
+        local gui = Instance.new("BillboardGui")
+        gui.Name = "ESP_UI"
+        gui.Adornee = head
+        gui.Size = UDim2.new(0, 170, 0, 42)
+        gui.StudsOffset = Vector3.new(0, 3.2, 0)
+        gui.AlwaysOnTop = true
+        gui.Enabled = espEnabled
+        gui.Parent = head
+
+        local container = Instance.new("Frame")
+        container.Size = UDim2.new(1, 0, 1, 0)
+        container.BackgroundTransparency = 1
+        container.Parent = gui
+
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Size = UDim2.new(1, 0, 0, 16)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = player.Name
+        nameLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
+        nameLabel.TextStrokeTransparency = 0.65
+        nameLabel.Font = Enum.Font.GothamSemibold
+        nameLabel.TextSize = 13
+        nameLabel.Parent = container
+
+        local barBG = Instance.new("Frame")
+        barBG.Size = UDim2.new(1, -26, 0, 7)
+        barBG.Position = UDim2.new(0, 13, 0, 24)
+        barBG.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+        barBG.BorderSizePixel = 0
+        barBG.Parent = container
+
+        Instance.new("UICorner", barBG).CornerRadius = UDim.new(1, 0)
+
+        local bgStroke = Instance.new("UIStroke")
+        bgStroke.Color = Color3.fromRGB(60, 60, 60)
+        bgStroke.Thickness = 1
+        bgStroke.Parent = barBG
+
+        local bar = Instance.new("Frame")
+        bar.Size = UDim2.new(1, 0, 1, 0)
+        bar.BackgroundColor3 = Color3.fromRGB(0, 200, 120)
+        bar.BorderSizePixel = 0
+        bar.Parent = barBG
+
+        Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
+
+        local barStroke = Instance.new("UIStroke")
+        barStroke.Color = Color3.fromRGB(0, 0, 0)
+        barStroke.Thickness = 0.6
+        barStroke.Transparency = 0.5
+        barStroke.Parent = bar
+
+        --------------------------------------------------------------------
+        -- 🔥 KO + HP + KILL SYSTEM
+        --------------------------------------------------------------------
+
+        local KOActive = false
+        local killAlreadyCounted = false
+
+        local function updateKO()
+            local ko = char:FindFirstChild("KO", true)
+            KOActive = ko ~= nil
+
+            if KOActive then
+                bar.Size = UDim2.new(0, 0, 1, 0)
+                bar.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+                killAlreadyCounted = tryKill(player, killAlreadyCounted)
+            else
+                local percent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+                bar.Size = UDim2.new(percent, 0, 1, 0)
+                bar.BackgroundColor3 = healthColor(percent)
+            end
+        end
+
+        char.DescendantAdded:Connect(function(obj)
+            if obj.Name == "KO" then
+                updateKO()
+            end
+        end)
+
+        char.DescendantRemoving:Connect(function(obj)
+            if obj.Name == "KO" then
+                task.wait()
+                updateKO()
+            end
+        end)
+
+        humanoid.HealthChanged:Connect(function(newHP)
+            if newHP < humanoid.MaxHealth then
+                if isAttacking then
+                    registerDamage(player)
+                end
+            end
+
+            if newHP <= 0 then
+                bar.Size = UDim2.new(0, 0, 1, 0)
+                bar.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+                killAlreadyCounted = tryKill(player, killAlreadyCounted)
+            end
+
+            if not KOActive and newHP > 0 then
+                local percent = math.clamp(newHP / humanoid.MaxHealth, 0, 1)
+                bar.Size = UDim2.new(percent, 0, 1, 0)
+                bar.BackgroundColor3 = healthColor(percent)
+            end
+        end)
+
+        updateKO()
+
+        RunService.Heartbeat:Connect(function()
+            if gui.Parent and espEnabled then
+                local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
+                local scale = getScale(dist)
+                gui.Size = UDim2.new(0, 170 * scale, 0, 42 * scale)
+            end
+        end)
+    end
+
+    if player.Character then
+        onCharacter(player.Character)
+    end
+
+    player.CharacterAdded:Connect(onCharacter)
+end
+
+for _, p in pairs(Players:GetPlayers()) do
+    createESP(p)
+end
+
+Players.PlayerAdded:Connect(createESP)
+
+UIS.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.F then
+        espEnabled = not espEnabled
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Character and p.Character:FindFirstChild("Head") then
+                local esp = p.Character.Head:FindFirstChild("ESP_UI")
+                if esp then
+                    esp.Enabled = espEnabled
+                end
+            end
+        end
+    end
+end)
