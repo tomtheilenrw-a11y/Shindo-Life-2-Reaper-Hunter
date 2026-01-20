@@ -1,0 +1,32 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+
+local function isInDanger()
+    -- Common pattern used by many games (including Shindo-like systems)
+    local danger = player:GetAttribute("InDanger")
+    return danger == true
+end
+
+local function resetCharacter()
+    local character = player.Character
+    if not character then return end
+
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.Health = 0
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    if input.KeyCode == Enum.KeyCode.K then
+        if isInDanger() then
+            warn("Cannot reset: You are in Danger Mode")
+        else
+            resetCharacter()
+        end
+    end
+end)
